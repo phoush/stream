@@ -11,6 +11,7 @@ CONSTANT_MEMORY_OPERAND = "I2"
 class LayerStackMode(Enum):
     STANDARD = 0
     OCCUPATION_BASED = 1
+    CORE_BASED = 2
 
 
 def fits(occupations, core_capacities, occupation_factor):

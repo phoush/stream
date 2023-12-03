@@ -7,7 +7,14 @@ from stream.classes.workload.node import Node
 from stream.classes.workload.tensor import Tensor
 from zigzag.classes.workload.layer_node import LayerNode
 
-
+mapping_attrs = {
+    "default": {
+        "core_allocation": 1,
+        # "spatial_mapping": {"D1": ("OX", 25), "D2": (("FX", 3), ("FY", 3))},
+        "memory_operand_links": {"O": "O", "W": "I2", "I": "I1"},
+        "spatial_mapping_hint": {"D1": ["K", "OX"], "D2": ["C", "FX", "FY"], "D3":["K","C","OX","OY","G"]},
+    }
+}
 class ComputationNode(LayerNode, Node):
     """Extension of ZigZag's concept of a "LayerNode" into a more general concept
     called "ComputationNode", which is not necessarily an entire layer,
@@ -53,6 +60,8 @@ class ComputationNode(LayerNode, Node):
             output_names=output_names,
         )
 
+        self.mapping_attrs = mapping_attrs
+        self.mappings = {}
         # Save the group id
         self.group = group_id
 

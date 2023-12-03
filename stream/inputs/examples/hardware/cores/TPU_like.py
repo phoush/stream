@@ -104,7 +104,7 @@ def get_memory_hierarchy(multiplier_array):
         memory_instance=reg_W_64B,
         operands=("I2",),
         port_alloc=({"fh": "w_port_1", "tl": "r_port_1", "fl": None, "th": None},),
-        served_dimensions={(0, 0)},
+        served_dimensions={(0, 0, 0)},
     )
     memory_hierarchy_graph.add_memory(
         memory_instance=reg_O_1K,
@@ -112,7 +112,7 @@ def get_memory_hierarchy(multiplier_array):
         port_alloc=(
             {"fh": "w_port_1", "tl": "r_port_1", "fl": "w_port_2", "th": "r_port_2"},
         ),
-        served_dimensions={(0, 1)},
+        served_dimensions={(0, 1, 0)},
     )
 
     ##################################### on-chip highest memory hierarchy initialization #####################################
@@ -153,12 +153,12 @@ def get_memory_hierarchy(multiplier_array):
     return memory_hierarchy_graph
 
 
-def get_operational_array():
+def get_operational_array(d3=1):
     """Multiplier array variables"""
     multiplier_input_precision = [8, 8]
     multiplier_energy = 0.04
     multiplier_area = 1
-    dimensions = {"D1": 32, "D2": 32}  # {'D1': ('K', 32), 'D2': ('C', 32)}
+    dimensions = {"D1": 32, "D2": 32, "D3": d3}
     multiplier = Multiplier(
         multiplier_input_precision, multiplier_energy, multiplier_area
     )
@@ -168,12 +168,12 @@ def get_operational_array():
 
 
 def get_dataflows():
-    return [{"D1": ("K", 32), "D2": ("C", 32)}, {"D1": ("G", 32)}]
+    return [{"D1": ("K", 32), "D2": ("C", 32), "D3": ("G", 32)}]
 
 
-def get_core(id):
-    operational_array = get_operational_array()
+def get_core(id, d3=1):
+    operational_array = get_operational_array(d3 = d3)
     memory_hierarchy = get_memory_hierarchy(operational_array)
     dataflows = get_dataflows()
-    core = Core(id, operational_array, memory_hierarchy, dataflows)
+    core = Core(id, operational_array, memory_hierarchy)
     return core

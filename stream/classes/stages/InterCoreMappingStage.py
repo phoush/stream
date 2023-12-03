@@ -49,6 +49,7 @@ class InterCoreMappingStage(Stage):
             nb_ga_generations (int): The number of generations considered by the genetic algorithm
             nb_ga_individuals (int): The number of individuals in each genetic algorithm generation
         """
+        breakpoint()
         super().__init__(list_of_callables, **kwargs)
         self.workload = workload
         self.accelerator = accelerator

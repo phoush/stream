@@ -1,4 +1,5 @@
 from .GenerateCNWorkloadHybridStage import GenerateCNWorkloadHybridStage
+from .GenerateNHPStage import GenerateNHPStage
 from .InterCoreMappingStage import InterCoreMappingStage
 from .IntraCoreMappingStage import IntraCoreMappingStage
 from .ModelParserStage import ONNXModelParserStage as StreamONNXModelParserStage

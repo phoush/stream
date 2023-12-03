@@ -49,6 +49,7 @@ class GenerateCNWorkloadHybridStage(Stage):
         super().__init__(list_of_callables, **kwargs)
         self.workload = workload
         self.accelerator = accelerator
+        breakpoint()
 
         # Save for each of the workload's nodes the finer nodes that will be generated
         self.finer_nodes_dict = {}
@@ -94,6 +95,8 @@ class GenerateCNWorkloadHybridStage(Stage):
                 node, ComputationNode
             ):  # If other node types shouldn't be included in finer node graph, add here
                 continue
+            print(node)
+            print(node.loop_dim_size)
             outer_temporal_loops = self.get_outer_tmap_loop_dimensions(node)
             finer_nodes, unique_nodes = self.get_finer_nodes(node, outer_temporal_loops)
             logger.info(f"{node}: Outer loops {outer_temporal_loops}.")
@@ -126,7 +129,6 @@ class GenerateCNWorkloadHybridStage(Stage):
 
         # Set the base_priority value of all nodes in G
         self.set_base_priority_of_nodes(G, self.finer_nodes_dict)
-
         # Set nb of real predecessors of all nodes in G
         self.set_nb_real_predecessors(G)
 
