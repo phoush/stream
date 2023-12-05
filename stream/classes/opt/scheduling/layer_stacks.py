@@ -52,6 +52,62 @@ def get_layer_stacks_standard(workload: DiGraph):
     layer_ids = sorted(set(node.id[0] for node in workload.nodes()))
     return [layer_ids]
 
+def get_layer_stacks_core_based(
+    workload: DiGraph,  # cn-wise workload
+    original_workload: DiGraph,  # layer-wise workload
+    accelerator: Accelerator,
+    core_allocations: list,
+    max_cores = 20
+):
+    # return stack of stacks of layer_ids
+    w = workload.copy()
+    # Get all layer id, group combinations in the workload
+    layer_groups = {}
+    core_allocations_dict = {}
+    ii_n = 0
+    for n in nx.topological_sort(w):
+        if not isinstance(n, ComputationNode):
+            continue
+        layer_id = n.id[0]
+        core_allocated = next((x for x in accelerator.cores.nodes() if x.id == core_allocations[ii_n]),None)
+        macros_allocated = next((x for x in core_allocated.operational_array.dimensions if x.name == 'D3'),None).size
+        core_allocations_dict[layer_id] = macros_allocated
+        n.core_allocation = core_allocated.id
+        n.attrs['core_allocation'] = core_allocated.id
+        n.set_core_allocation(core_allocated.id)
+        ii_n += 1
+    # Active cores given the allocations of the workload
+    # Store all stacks
+    all_stacks = []
+    # Store the ids in the current stack
+    current_stack = []
+    # Track the constant operand occupation in all cores for the current stack
+    # Compute the layer cutoffs based on the topological generations
+    # and the constant operands size
+    occupied_cores = 0
+    for i, generation in enumerate(nx.topological_generations(w)):
+        for original_node in generation:
+            if not isinstance(original_node, ComputationNode):
+                continue
+            layer_id = original_node.id[0]
+            occupied_cores += core_allocations_dict[layer_id]
+            # Check if the occupation exceeds the capacity * occupation_factor for any core
+            if occupied_cores <= max_cores:
+                # Add this layer to the current stack as it fits
+                current_stack.append(layer_id)
+            else:
+                all_stacks.append(sorted(current_stack))
+                # Reset the current stack to include the current layer that didn't fit
+                current_stack = [layer_id]
+                # Reset the occupations to include the current layer that didn't fit
+                occupied_cores = core_allocations_dict[layer_id]
+
+
+    if current_stack:
+        all_stacks.append(current_stack)
+    return all_stacks, w
+
+
 
 def get_layer_stacks_occupation_based(
     workload: DiGraph,  # cn-wise workload
@@ -122,10 +178,11 @@ def get_layer_stacks_occupation_based(
 
 def get_layer_stacks(
     workload: DiGraph,  # cn-wise workload
-    original_workload: DiGraph,  # layer-wise workload
     accelerator: Accelerator,
-    occupation_factor: int,
     mode: LayerStackMode,
+    core_allocations: list,
+    original_workload: DiGraph=None,  # layer-wise workload
+    occupation_factor: int=None
 ):
     if mode == LayerStackMode.STANDARD:
         layer_stacks = get_layer_stacks_standard(workload)
@@ -135,6 +192,13 @@ def get_layer_stacks(
             original_workload,
             accelerator,
             occupation_factor,
+        )
+    elif mode == LayerStackMode.CORE_BASED:
+        layer_stacks = get_layer_stacks_core_based(
+            workload,
+            original_workload,
+            accelerator,
+            core_allocations,
         )
     else:
         raise ValueError(f"Invalid layer stack calculation mode: {mode}.")

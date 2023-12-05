@@ -8,8 +8,10 @@ from stream.classes.opt.allocation.genetic_algorithm.genetic_algorithm import (
 )
 from stream.classes.opt.allocation.genetic_algorithm.fitness_evaluator import (
     StandardFitnessEvaluator,
+    CoreBasedFitnessEvaluator
 )
 from stream.utils import get_too_large_operands
+import networkx as nx
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +51,6 @@ class NHInterCoreMappingStage(Stage):
             nb_ga_generations (int): The number of generations considered by the genetic algorithm
             nb_ga_individuals (int): The number of individuals in each genetic algorithm generation
         """
-        breakpoint()
         super().__init__(list_of_callables, **kwargs)
         self.workload = workload
         self.accelerator = accelerator
@@ -62,61 +63,23 @@ class NHInterCoreMappingStage(Stage):
         self.plot_data_transfer = plot_data_transfer
         self.scheduler_candidate_selection = scheduler_candidate_selection
         self.operands_to_prefetch = operands_to_prefetch
-        self.original_workload = kwargs["original_workload"]
+#        self.original_workload = self.workload #kwargs["original_workload"]
 
-        # Determine the set of all (layer, group) combinations to be allocated separately
-        self.layer_groups = sorted(
-            set((n.id[0], n.group) for n in self.workload.nodes())
-        )
-
-        # self.coarse_node_ids contains all the original node (aka layers) ids of the original graph
-        self.unique_nodes = list(
-            set((n for n, hw_performances in self.node_hw_performances.items()))
-        )
-        self.coarse_node_ids = [id[0] for id in self.layer_groups]
-        # self.coarse_node_ids_flexible contains only those original node ids that have flexibility: they can be allocated to more than one core
-        self.unique_nodes_flexible = sorted(
-            set(
-                (
-                    n
-                    for n, hw_performances in self.node_hw_performances.items()
-                    if len(hw_performances.keys()) > 1
-                )
-            ),
-            key=attrgetter("id"),
-        )
-        self.coarse_node_ids_flexible = [n.id[0] for n in self.unique_nodes_flexible]
-        # For each unique node get the possible core allocations by getting the ids of the cores in node_hw_performances
         self.valid_allocations = []
-        # Save all the layer group combinations that are flexible
-        self.layer_groups_flexible = []
-        for layer_id, group_id in self.layer_groups:
-            # Find the unique node that corresponds to this layer
-            # This assumes all the nodes of this layer are identical
-            unique_node = next((n for n in self.unique_nodes if n.id[0] == layer_id))
-            if unique_node in self.unique_nodes_flexible:
-                hw_performances = self.node_hw_performances[unique_node]
-                valid_core_ids = [core.id for core in hw_performances.keys() if core.id < len(self.unique_nodes_flexible)]
-                self.layer_groups_flexible.append((layer_id, group_id))
-                self.valid_allocations.append(valid_core_ids)
-
-        # Set the hardware performance and core_allocation of nodes in the workload that only have a single possible core allocation
-        self.set_hw_performance_non_flexible_nodes()
-
+        for node in nx.topological_sort(self.workload):
+            if not isinstance(node, ComputationNode):
+                continue
+            self.valid_allocations.append([x.id for x in node.mappings.keys()])
         # Initialize the fitness evaluator of different core allocations
-        self.fitness_evaluator = StandardFitnessEvaluator(
+        self.fitness_evaluator = CoreBasedFitnessEvaluator(
             self.workload,
-            self.accelerator,
-            self.node_hw_performances,
-            self.layer_groups_flexible,
-            self.scheduler_candidate_selection,
-            self.operands_to_prefetch,
-            self.original_workload,
+            self.accelerator
         )
 
         # Extract the length of an individual.
         # This is the number of unique original nodes that have more than one possible core allocation
-        self.individual_length = len(self.layer_groups_flexible)
+        #self.individual_length = len(self.layer_groups_flexible)
+        self.individual_length = self.workload.number_of_nodes()
         # Extract the value range each gene in the individual can have.
         # This ranges from 0 to the max core index.
         # TODO There might be some case where a core is not possible, so it shouldnt be tried by the GA

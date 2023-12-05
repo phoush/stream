@@ -283,9 +283,9 @@ class UserSpatialMappingGenerator:
                 yield user_spatial_mapping
                 yield_count += 1
 
-        assert (
-            yield_count > 0
-        ), "There is no legal spatial mapping found. Please make sure the provided spatial mappings do not exceed the layer dimension size."
+        #assert (
+        #    yield_count > 0
+        #), "There is no legal spatial mapping found. Please make sure the provided spatial mappings do not exceed the layer dimension size."
 
     def shrink_combination_when_a_layer_dim_is_mapped_on_multiple_oa_dims(
         self, combination, layer

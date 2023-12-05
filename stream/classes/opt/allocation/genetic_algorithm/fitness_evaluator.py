@@ -1,7 +1,12 @@
 from stream.classes.cost_model.cost_model import StreamCostModelEvaluation
 from stream.classes.opt.scheduling.layer_stacks import get_layer_stacks, LayerStackMode
+from stream.classes.opt.splitting.cn_graph import get_cn_graph
 from stream.classes.workload.computation_node import ComputationNode
 from zigzag.utils import pickle_deepcopy
+import networkx as nx
+import numpy as np
+
+from copy import deepcopy
 
 from stream.utils import get_too_large_operands
 
@@ -17,6 +22,66 @@ class FitnessEvaluator:
 
     def get_fitness(self):
         raise NotImplementedError
+
+class CoreBasedFitnessEvaluator(FitnessEvaluator):
+    """The core based fitness evaluator considers latency cost."""
+
+    def __init__(
+        self,
+        workload,
+        accelerator
+        #original_workload,  # used for layer stack calculation
+    ) -> None:
+        super().__init__(workload, accelerator)
+
+        self.weights = (-1.0, -1.0)
+        self.metrics = ["energy", "latency"]
+        self.accelerator = accelerator
+        self.workload = workload
+        self.constant_operand_occupation_factor = 1
+        self.layer_stacks_mode = LayerStackMode.CORE_BASED
+        self.scheduler_candidate_selection = 'latency'
+
+    def get_fitness(self, core_allocations: list, return_scme=False):
+        """Get the fitness of the given core_allocations
+
+        Args:
+            core_allocations (list): core_allocations
+        """
+        layer_stacks, workload_with_allocations = get_layer_stacks(
+            workload=self.workload,
+            accelerator=self.accelerator,
+            mode=self.layer_stacks_mode,
+            core_allocations = core_allocations
+        )
+        # generate new graph here
+        w = deepcopy(workload_with_allocations)
+        G = get_cn_graph(w, self.accelerator)
+        self.cn_graph = G
+        self.set_cost_cn_nodes()
+        
+        scme = StreamCostModelEvaluation(
+            pickle_deepcopy(self.cn_graph),
+            pickle_deepcopy(self.accelerator),
+            self.scheduler_candidate_selection,
+            [],
+            layer_stacks,
+        )
+        scme.run()
+        energy = scme.energy
+        latency = scme.latency
+        if not return_scme:
+            return energy, latency
+        return energy, latency, scme
+
+    def set_cost_cn_nodes(self):
+        for node in nx.topological_sort(self.cn_graph):
+            latency = np.prod([x[1] for x in node.producer_inner_loops])
+
+            node.set_onchip_energy(1)
+            node.set_offchip_energy(1)
+            node.set_runtime(latency)
+            node.set_too_large_operands(False)
 
 
 class StandardFitnessEvaluator(FitnessEvaluator):
@@ -133,3 +198,6 @@ class StandardFitnessEvaluator(FitnessEvaluator):
                 node.set_runtime(latency)
                 node.set_core_allocation(core_allocation)
                 node.set_too_large_operands(too_large_operands)
+
+
+

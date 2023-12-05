@@ -69,8 +69,6 @@ class GenerateNHPStage(Stage):
                 node, ComputationNode
             ):  # If other node types shouldn't be included in finer node graph, add here
                 continue
-            print(node)
-            print(node.loop_dim_size)
             if frozenset(node.loop_dim_size.items()) not in unique_layers:
                 unique_layers.add(frozenset(node.loop_dim_size.items()))
                 unique_nodes.add(tuple([frozenset(node.loop_dim_size.items()), node]))
@@ -117,7 +115,6 @@ class GenerateNHPStage(Stage):
         kwargs["workload"] = self.workload
         kwargs["accelerator"] = self.accelerator
 #        kwargs["node_hw_performances"] = self.node_hw_performances
-        breakpoint()
         sub_stage = self.list_of_callables[0](self.list_of_callables[1:], **kwargs)
         for cme, extra_info in sub_stage.run():
             yield cme, extra_info
@@ -139,9 +136,9 @@ class GenerateNHPStage(Stage):
 
         main_stage = MainStage(
             [  # Initializes the MainStage as entry point
-                MinimalLatencyStage,
+                MinimalEnergyStage,
                 SpatialMappingGeneratorStage,  # Generates multiple spatial mappings (SM)
-                MinimalLatencyStage,  # Reduces all CMEs, returning minimal latency one
+                MinimalEnergyStage,  # Reduces all CMEs, returning minimal latency one
                 LomaStage,  # Generates multiple temporal mappings (TM)
                 CostModelStage,  # Evaluates generated SM and TM through cost model
             ],

@@ -40,6 +40,7 @@ class ComputationNode(LayerNode, Node):
         produces_final_output=False,
         add_missing_node_attrs=False,
         group_id=0,
+        mappings={}
     ):
         assert isinstance(
             node_id, tuple
@@ -61,7 +62,10 @@ class ComputationNode(LayerNode, Node):
         )
 
         self.mapping_attrs = mapping_attrs
-        self.mappings = {}
+        self.mappings = mappings
+        self.stride = {'IY':1,'IX':1}
+        self.producer_inner_loops = []
+#        self.padding = 0
         # Save the group id
         self.group = group_id
 
@@ -195,6 +199,11 @@ class ComputationNode(LayerNode, Node):
 
     def calculate_pr_loop_ranges(self):
         """Add the loop ranges of the partially revelant dimensions for this node to self.loop_ranges"""
+        try:
+            self.stride['IX'] = self.pr_scaling_factors['IX']['ox']
+            self.stride['IY'] = self.pr_scaling_factors['IY']['oy']
+        except:
+            pass
         for pr_dim, related_dims_and_scalings in self.pr_scaling_factors.items():
             dim_padding = self.padding.get(pr_dim, (0, 0))
             padding_begin = dim_padding[0]

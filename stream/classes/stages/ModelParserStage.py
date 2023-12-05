@@ -3,10 +3,22 @@ from typing import Generator
 from stream.classes.io.onnx.model import ONNXModelParser
 from zigzag.classes.stages.Stage import Stage
 from zigzag.utils import pickle_deepcopy
+from stream.classes.workload.computation_node import ComputationNode
+import networkx as nx
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+def sanitize_workload_graph(workload):
+    # remove any node in the workload graph
+    # that is not a computation node.
+    # Reconnect edges from removed nodes
+    for node in nx.topological_sort(workload):
+        if not isinstance(node, ComputationNode):
+            workload.add_edge(*workload.predecessors(node), *workload.successors(node))
+            workload.remove_node(node)
+    return workload
 
 
 class ONNXModelParserStage(Stage):
@@ -24,7 +36,6 @@ class ONNXModelParserStage(Stage):
         self.onnx_model_parser.run()
         onnx_model = self.onnx_model_parser.get_onnx_model()
         workload = self.onnx_model_parser.get_workload()
-
         self.kwargs["accelerator"] = self.accelerator
         self.kwargs["mapping_path"] = self.mapping_path
         sub_stage = self.list_of_callables[0](

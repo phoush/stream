@@ -100,6 +100,7 @@ class InterCoreMappingStage(Stage):
                 self.layer_groups_flexible.append((layer_id, group_id))
                 self.valid_allocations.append(valid_core_ids)
 
+        breakpoint()
         # Set the hardware performance and core_allocation of nodes in the workload that only have a single possible core allocation
         self.set_hw_performance_non_flexible_nodes()
 

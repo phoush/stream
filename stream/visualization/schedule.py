@@ -104,7 +104,7 @@ def plot_timeline_brokenaxes(
         else:
             color = colors_seen[layer_ids_seen.index(layer_id)]
         x = cn.start  # + 0.05
-        y = cn.core_allocation - 0.25
+        y = cn.core_allocation[0] - 0.25
         width = cn.runtime  # - 0.05
         if (
             (x_starts[0] <= x <= x_ends[0])
@@ -255,8 +255,8 @@ def plot_timeline_brokenaxes(
     for prod, cons in G.edges():
         p_l = prod.id[0]
         c_l = cons.id[0]
-        p_core = prod.core_allocation
-        c_core = cons.core_allocation
+        p_core = prod.core_allocation[0]
+        c_core = cons.core_allocation[0]
         if not PLOT_DEPENDENCY_LINES_SAME_CORE and p_core == c_core:
             continue
         p_start = prod.start
@@ -382,10 +382,10 @@ def add_dependencies(fig, scme, colors):
             p_start = pred.start
             p_runtime = pred.runtime
             p_end = pred.end
-            p_core = pred.core_allocation
+            p_core = pred.core_allocation[0]
             c_start = node.start
             c_runtime = node.runtime
-            c_core = node.core_allocation
+            c_core = node.core_allocation[0]
             legendgroup = f"Layer {c_l}"
             legendgrouptitle_text = legendgroup
             marker = {"color": colors[c_l]}
@@ -461,7 +461,7 @@ def get_dataframe_from_scme(scme, add_communication=False):
     for node in nodes:
         id = node.id
         layer = id[0]
-        core_id = node.core_allocation
+        core_id = node.core_allocation[0]
         start = node.start
         end = node.end
         runtime = node.runtime

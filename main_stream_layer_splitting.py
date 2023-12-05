@@ -21,7 +21,7 @@ _logging.basicConfig(level=_logging_level, format=_logging_format)
 
 ################################INPUTS################################
 accelerator = "stream.inputs.examples.hardware.TPU_like_quad_core"
-workload_path = "stream/inputs/examples/workload/mlperf_tiny/deepautoencoder.onnx"
+workload_path = "stream/inputs/examples/workload/mlperf_tiny/resnet8.onnx"
 mapping_path = "stream.inputs.examples.mapping.tpu_like_quad_core_resnet18_fixed_split"
 mapping_path = "zigzag.inputs.examples.mapping.default"
 CN_define_mode = 4  # automatically split layers if too big to fit
@@ -69,9 +69,10 @@ mainstage = MainStage(
         StreamONNXModelParserStage,  # Parses the ONNX Model into the workload
         # UserDefinedModelParserStage,  # Parses the user-defined Model into the workload
         GenerateNHPStage,
+        NHInterCoreMappingStage,
         #GenerateCNWorkloadHybridStage,
-        IntraCoreMappingStage,
-        InterCoreMappingStage,
+        #IntraCoreMappingStage,
+        #InterCoreMappingStage,
     ],
     accelerator=accelerator,  # required by AcceleratorParserStage
     workload_path=workload_path,  # required by ModelParserStage

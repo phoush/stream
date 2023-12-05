@@ -74,6 +74,8 @@ class SpatialMappingGeneratorStage(Stage):
         core_id = self.layer.core_allocation
         core: Core = self.accelerator.get_core(core_id=core_id)
         oa_dims = core.operational_array.dimensions
+        print('OA DIMS', oa_dims)
+        print('layer', self.layer.loop_dim_size)
         if isinstance(
             user_provided_spatial_mappings, dict
         ):  # There is a single USM provided

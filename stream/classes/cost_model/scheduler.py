@@ -319,22 +319,22 @@ def schedule_graph(
 
     ## Schedule preparation:
     # 1. Initialize the memory instance priorities for each tensor
-    initialize_priorities(G, accelerator)
+    #initialize_priorities(G, accelerator)
     # 2. Add the constant operand tensors of all nodes to the off-chip initially
-    initialize_offchip_tensors(G, accelerator)
+    #initialize_offchip_tensors(G, accelerator)
     # 3. Prefetch the constant operands that should be prefetched to their core
-    (
-        prefetch_cn_offchip_link_energy,
-        prefetch_cn_offchip_memory_energy,
-        prefetch_eviction_to_offchip_link_energy,
-        prefetch_eviction_to_offchip_memory_energy,
-    ) = prefetch_constant_operands(G, accelerator, operands_to_prefetch)
-    total_cn_offchip_link_energy += prefetch_cn_offchip_link_energy
-    total_cn_offchip_memory_energy += prefetch_cn_offchip_memory_energy
-    total_eviction_to_offchip_link_energy += prefetch_eviction_to_offchip_link_energy
-    total_eviction_to_offchip_memory_energy += (
-        prefetch_eviction_to_offchip_memory_energy
-    )
+    #(
+    #    prefetch_cn_offchip_link_energy,
+    #    prefetch_cn_offchip_memory_energy,
+    #    prefetch_eviction_to_offchip_link_energy,
+    #    prefetch_eviction_to_offchip_memory_energy,
+    #) = prefetch_constant_operands(G, accelerator, operands_to_prefetch)
+    #total_cn_offchip_link_energy += prefetch_cn_offchip_link_energy
+    #total_cn_offchip_memory_energy += prefetch_cn_offchip_memory_energy
+    #total_eviction_to_offchip_link_energy += prefetch_eviction_to_offchip_link_energy
+    #total_eviction_to_offchip_memory_energy += (
+    #    prefetch_eviction_to_offchip_memory_energy
+    #)
 
     done = False
     while not done:
@@ -456,46 +456,46 @@ def schedule_graph(
         cores_idle_from[core_id] = end
 
         # Add the computation energy of running this node
-        total_cn_onchip_energy += best_candidate.get_onchip_energy()
-        total_cn_offchip_memory_energy += best_candidate.get_offchip_energy()
+        #total_cn_onchip_energy += best_candidate.get_onchip_energy()
+        #total_cn_offchip_memory_energy += best_candidate.get_offchip_energy()
 
         # Add this node to the scheduled nodes
         scheduled_nodes.add(best_candidate)
 
-        ## Step 6
-        # Memory usage: When the node ends:
-        # Decrease the priority of all the tensors this node used
-        decrease_priority(
-            tensors_this_candidate_needs, tensors_operands, accelerator, best_candidate
-        )
-        # Remove the tensor if the priority is zero
-        check_for_removal(
-            tensors_this_candidate_needs,
-            accelerator,
-            best_candidate,
-            G,
-            end,
-        )
+        ### Step 6
+        ## Memory usage: When the node ends:
+        ## Decrease the priority of all the tensors this node used
+        #decrease_priority(
+        #    tensors_this_candidate_needs, tensors_operands, accelerator, best_candidate
+        #)
+        ## Remove the tensor if the priority is zero
+        #check_for_removal(
+        #    tensors_this_candidate_needs,
+        #    accelerator,
+        #    best_candidate,
+        #    G,
+        #    end,
+        #)
 
         ## Step 7
         # Memory usage: When the node ends:
         # If this node is a sink node (node that has no successors and that produces a final output), transfer final outputs to offchip
-        if best_candidate in sink_layer_nodes:
-            # Only push back sink node outputs if they're generated and stored on the core
-            if not best_candidate.output_operand in best_candidate.too_large_operands:
-                (
-                    current_timestep,
-                    link_energy_cost,
-                    memory_energy_cost,
-                ) = accelerator.remove(
-                    output_tensor,
-                    core,
-                    output_tensor.memory_operand,
-                    end,
-                    write_back_to_offchip=True,
-                )
-                total_sink_layer_output_offchip_link_energy += link_energy_cost
-                total_sink_layer_output_offchip_memory_energy += memory_energy_cost
+        #if best_candidate in sink_layer_nodes:
+        #    # Only push back sink node outputs if they're generated and stored on the core
+        #    if not best_candidate.output_operand in best_candidate.too_large_operands:
+        #        (
+        #            current_timestep,
+        #            link_energy_cost,
+        #            memory_energy_cost,
+        #        ) = accelerator.remove(
+        #            output_tensor,
+        #            core,
+        #            output_tensor.memory_operand,
+        #            end,
+        #            write_back_to_offchip=True,
+        #        )
+        #        total_sink_layer_output_offchip_link_energy += link_energy_cost
+        #        total_sink_layer_output_offchip_memory_energy += memory_energy_cost
 
         ## Step 8
         # For each successor of this node, check if all of its predecessors have been scheduled
@@ -519,6 +519,288 @@ def schedule_graph(
         [event.end for event in accelerator.communication_manager.events], default=0
     )
     latency = max(cns_end_time, links_end_time)
+    # print("Scheduling completed")
+    # print(f"Latency found = {latency}")
+    return (
+        latency,
+        total_cn_onchip_energy,
+        total_cn_offchip_link_energy,
+        total_cn_offchip_memory_energy,
+        total_eviction_to_offchip_link_energy,
+        total_eviction_to_offchip_memory_energy,
+        total_sink_layer_output_offchip_link_energy,
+        total_sink_layer_output_offchip_memory_energy,
+        total_core_to_core_link_energy,
+        total_core_to_core_memory_energy,
+    )
+
+
+def schedule_graph_no_memories(
+    G: DiGraph,
+    accelerator: Accelerator,
+    layer_stacks: list,
+    cores_idle_from=None,
+    candidate_selection="latency",
+    operands_to_prefetch=[],
+):
+    """Schedule the nodes of graph G across the cores in the system.
+    Each node should have a core_allocation and runtime set.
+
+    Args:
+        G (DiGraph): Graph containing the nodes to be scheduled.
+        accelerator (Accelerator): The accelerator to schedule the nodes on.
+        cores_start_offset (dict, optional): A dict containing for each core_id its start offset. Defaults to None.
+        operands_to_prefetch (list, optional): The layer operands that should be prefetched at the start of the schedule.
+    """
+    # Initialize total link energy cost and memory energy costs
+    total_cn_onchip_energy = 0
+    total_cn_offchip_link_energy, total_cn_offchip_memory_energy = 0, 0
+    total_eviction_to_offchip_link_energy, total_eviction_to_offchip_memory_energy = (
+        0,
+        0,
+    )
+    (
+        total_sink_layer_output_offchip_link_energy,
+        total_sink_layer_output_offchip_memory_energy,
+    ) = (0, 0)
+    total_core_to_core_link_energy, total_core_to_core_memory_energy = 0, 0
+
+    all_core_ids = sorted(list(set(n.core_allocation[0] for n in G.nodes())))
+    if cores_idle_from is None:
+        # Make it 0 for all cores
+        cores_idle_from = {core_allocation: 0 for core_allocation in all_core_ids}
+
+    nb_graph_nodes = G.number_of_nodes()
+    nb_scheduled_nodes = 0
+    scheduled_nodes = set()
+
+    # List that keeps all possible candidate nodes for each core.
+    candidates = []
+
+    # Put the very first nodes of a layer that doesn't have any incoming edges as the first candidates
+    for source_node in (n for n, d in G.in_degree() if d == 0):
+        core_allocation = source_node.core_allocation
+        core_allocation = core_allocation[0]
+        # core_candidates[core_allocation].append((cores_idle_from[core_allocation], source_node))
+        candidates.append((cores_idle_from[core_allocation], source_node))
+
+    # Get all the nodes with no successors that produce final outputs, used for off-loading final outputs
+    sink_layers = sorted(set(n.id[0] for n, d in G.out_degree() if d == 0))
+    sink_layer_nodes = set(
+        (
+            n
+            for n in G.nodes()
+            if (n.id[0] in sink_layers) and (n.produces_final_output is True)
+        )
+    )
+
+    # Get the offchip core id and core
+    #offchip_core_id = accelerator.offchip_core_id
+    #offchip_core = accelerator.get_core(offchip_core_id)
+
+    ## Schedule preparation:
+    # 1. Initialize the memory instance priorities for each tensor
+    #initialize_priorities(G, accelerator)
+    # 2. Add the constant operand tensors of all nodes to the off-chip initially
+    #initialize_offchip_tensors(G, accelerator)
+    ## 3. Prefetch the constant operands that should be prefetched to their core
+    #(
+    #    prefetch_cn_offchip_link_energy,
+    #    prefetch_cn_offchip_memory_energy,
+    #    prefetch_eviction_to_offchip_link_energy,
+    #    prefetch_eviction_to_offchip_memory_energy,
+    #) = prefetch_constant_operands(G, accelerator, operands_to_prefetch)
+    #total_cn_offchip_link_energy += prefetch_cn_offchip_link_energy
+    #total_cn_offchip_memory_energy += prefetch_cn_offchip_memory_energy
+    #total_eviction_to_offchip_link_energy += prefetch_eviction_to_offchip_link_energy
+    #total_eviction_to_offchip_memory_energy += (
+    #    prefetch_eviction_to_offchip_memory_energy
+    #)
+
+    done = False
+    while not done:
+        # Get the best candidate given the selection priority
+        best_candidate, preds_end = get_best_candidate(
+            candidates, candidate_selection, layer_stacks
+        )
+
+        # Get the core this candidate will be scheduled on
+        core_id = best_candidate.core_allocation[0]
+        core = accelerator.get_core(core_id)
+        # Earliest start time is when core is available or predecessors finished
+        start = max(cores_idle_from[core_id], preds_end)
+        ## Step 0
+        #tensors_this_candidate_needs, tensors_operands = get_tensors_needed_for_node(
+        #    best_candidate, G
+        #)
+        ### Step 1
+        ## There could be operands that are too large to store in the highest memory on the core
+        ## The tensors stored in these memories should be evicted and potentially written back to off-chip
+        ## Clear these memories (this might delay the potential start time if things have to written to off-chip)
+        #timestep = start
+        #(
+        #    clear_link_energy,
+        #    clear_memory_energy,
+        #    timestep,
+        #) = clear_memories(
+        #    accelerator,
+        #    core,
+        #    best_candidate.too_large_operands,
+        #    timestep,
+        #    exceptions=tensors_this_candidate_needs,
+        #)
+        #total_eviction_to_offchip_link_energy += clear_link_energy
+        #total_eviction_to_offchip_memory_energy += clear_memory_energy
+        ### Step 2
+        ## The computation might need tensors that are currently not present in the core's memories
+        ## We need to fetch these tensors from either off-chip or from the core where they are present
+        ## Transfer these tensors from wherever they are currently residing to this core
+        #for tensor, tensor_operand in zip(
+        #    tensors_this_candidate_needs, tensors_operands
+        #):
+        #    # Transfer the tensor
+        #    (
+        #        transfer_complete_timestep,
+        #        transfer_link_energy_cost,
+        #        transfer_memory_energy_cost,
+        #        eviction_link_energy_cost,
+        #        eviction_memory_energy_cost,
+        #        came_from_offchip,
+        #    ) = accelerator.transfer_tensor_to_core(
+        #        tensor,
+        #        core_id,
+        #        tensor_operand,
+        #        tensors_this_candidate_needs,
+        #    )
+        #    # Update the possible start time of this node
+        #    timestep = max(timestep, transfer_complete_timestep)
+        #    # Add the energy costs to their respective trackers
+        #    if came_from_offchip:
+        #        total_cn_offchip_link_energy += transfer_link_energy_cost
+        #        total_cn_offchip_memory_energy += transfer_memory_energy_cost
+        #    else:
+        #        total_core_to_core_link_energy += transfer_link_energy_cost
+        #        total_core_to_core_memory_energy += transfer_memory_energy_cost
+        #    total_eviction_to_offchip_link_energy += eviction_link_energy_cost
+        #    total_eviction_to_offchip_memory_energy += eviction_memory_energy_cost
+
+        ### Step 3
+        ## Check if we had any operands that were too large to store in the core's memory, block the relevant off-chip link for the duration
+        ## This might again delay the execution if the offchip link was already blocked by another core
+        #timestep = accelerator.block_offchip_links(
+        #    best_candidate.too_large_operands,
+        #    core_id,
+        #    timestep,
+        #    best_candidate.get_runtime(),
+        #    best_candidate,
+        #)
+
+        ### Step 4
+        ## Make space for the output tensor of this computation node and spawn it when evictions are complete
+        ## If the output operand is in the too large operands, add it to off-chip, otherwise add it to this core's output memory
+        #output_layer_operand = best_candidate.output_operand
+        #output_memory_operand = best_candidate.memory_operand_links[
+        #    output_layer_operand
+        #]
+        #output_tensor = best_candidate.operand_tensors[output_layer_operand]
+        #if output_memory_operand in best_candidate.too_large_operands:
+        #    core_to_add_output_to = offchip_core
+        #else:
+        #    core_to_add_output_to = core
+        #(
+        #    evictions_complete_timestep,
+        #    eviction_link_energy_cost,
+        #    eviction_memory_energy_cost,
+        #) = accelerator.make_space_for(
+        #    output_tensor,
+        #    core_to_add_output_to,
+        #    output_memory_operand,
+        #    timestep,
+        #    tensors_this_candidate_needs,
+        #)
+        #total_eviction_to_offchip_link_energy += eviction_link_energy_cost
+        #total_eviction_to_offchip_memory_energy += eviction_memory_energy_cost
+        #start = evictions_complete_timestep
+        end = start + best_candidate.get_runtime()
+        #accelerator.spawn(
+        #    output_tensor,
+        #    core_to_add_output_to,
+        #    output_memory_operand,
+        #    initial_timestep=start,
+        #    available_timestep=end,
+        #)
+
+        ## Step 5
+        # Update the start and end time of the node
+        best_candidate.set_start(start)
+        best_candidate.set_end(end)
+        cores_idle_from[core_id] = end
+
+        # Add the computation energy of running this node
+        #total_cn_onchip_energy += best_candidate.get_onchip_energy()
+        #total_cn_offchip_memory_energy += best_candidate.get_offchip_energy()
+
+        # Add this node to the scheduled nodes
+        scheduled_nodes.add(best_candidate)
+
+        ## Step 6
+        # Memory usage: When the node ends:
+        # Decrease the priority of all the tensors this node used
+        #decrease_priority(
+        #    tensors_this_candidate_needs, tensors_operands, accelerator, best_candidate
+        #)
+        # Remove the tensor if the priority is zero
+        #check_for_removal(
+        #    tensors_this_candidate_needs,
+        #    accelerator,
+        #    best_candidate,
+        #    G,
+        #    end,
+        #)
+
+        ## Step 7
+        # Memory usage: When the node ends:
+        # If this node is a sink node (node that has no successors and that produces a final output), transfer final outputs to offchip
+        #if best_candidate in sink_layer_nodes:
+        #    # Only push back sink node outputs if they're generated and stored on the core
+        #    if not best_candidate.output_operand in best_candidate.too_large_operands:
+        #        (
+        #            current_timestep,
+        #            link_energy_cost,
+        #            memory_energy_cost,
+        #        ) = accelerator.remove(
+        #            output_tensor,
+        #            core,
+        #            output_tensor.memory_operand,
+        #            end,
+        #            write_back_to_offchip=True,
+        #        )
+        #        total_sink_layer_output_offchip_link_energy += link_energy_cost
+        #        total_sink_layer_output_offchip_memory_energy += memory_energy_cost
+
+        ## Step 8
+        # For each successor of this node, check if all of its predecessors have been scheduled
+        for successor in sorted(G.successors(best_candidate)):
+            if all((pred in scheduled_nodes for pred in G.predecessors(successor))):
+                preds_end = max(
+                    (predecessor.end for predecessor in G.predecessors(successor)),
+                    default=0,
+                )
+                # core_candidates[successor.core_allocation].append((preds_end, successor))
+                candidates.append((preds_end, successor))
+
+        # Increment the number of scheduled nodes
+        nb_scheduled_nodes += 1
+        done = nb_scheduled_nodes == nb_graph_nodes
+
+    ## Step 9
+    # The total schedule latency is the max of all CN end times and the link end times
+    cns_end_time = max((n.end for n in G.nodes()))
+    #links_end_time = max(
+    #    [event.end for event in accelerator.communication_manager.events], default=0
+    #)
+    #latency = max(cns_end_time, links_end_time)
+    latency = cns_end_time
     # print("Scheduling completed")
     # print(f"Latency found = {latency}")
     return (
