@@ -13,6 +13,8 @@ from stream.classes.opt.allocation.genetic_algorithm.fitness_evaluator import (
 from stream.utils import get_too_large_operands
 import networkx as nx
 
+from copy import deepcopy
+
 logger = logging.getLogger(__name__)
 
 
@@ -54,6 +56,7 @@ class NHInterCoreMappingStage(Stage):
         super().__init__(list_of_callables, **kwargs)
         self.workload = workload
         self.accelerator = accelerator
+        self.core_based_accelerator = deepcopy(self.accelerator)
        # self.node_hw_performances = node_hw_performances
         self.nb_generations = nb_ga_generations
         self.nb_individuals = nb_ga_individuals
@@ -73,7 +76,8 @@ class NHInterCoreMappingStage(Stage):
         # Initialize the fitness evaluator of different core allocations
         self.fitness_evaluator = CoreBasedFitnessEvaluator(
             self.workload,
-            self.accelerator
+            self.accelerator,
+            self.core_based_accelerator
         )
 
         # Extract the length of an individual.

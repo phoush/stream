@@ -29,7 +29,8 @@ class CoreBasedFitnessEvaluator(FitnessEvaluator):
     def __init__(
         self,
         workload,
-        accelerator
+        accelerator,
+        core_based_accelerator
         #original_workload,  # used for layer stack calculation
     ) -> None:
         super().__init__(workload, accelerator)
@@ -37,6 +38,7 @@ class CoreBasedFitnessEvaluator(FitnessEvaluator):
         self.weights = (-1.0, -1.0)
         self.metrics = ["energy", "latency"]
         self.accelerator = accelerator
+        self.core_based_accelerator = core_based_accelerator
         self.workload = workload
         self.constant_operand_occupation_factor = 1
         self.layer_stacks_mode = LayerStackMode.CORE_BASED
@@ -54,15 +56,17 @@ class CoreBasedFitnessEvaluator(FitnessEvaluator):
             mode=self.layer_stacks_mode,
             core_allocations = core_allocations
         )
+        core_allocations = self.update_core_based_accelerator(layer_stacks, 
+                workload_with_allocations, core_allocations)
         # generate new graph here
         w = deepcopy(workload_with_allocations)
-        G = get_cn_graph(w, self.accelerator)
+        G = get_cn_graph(w, self.core_based_accelerator)
         self.cn_graph = G
         self.set_cost_cn_nodes()
         
         scme = StreamCostModelEvaluation(
             pickle_deepcopy(self.cn_graph),
-            pickle_deepcopy(self.accelerator),
+            pickle_deepcopy(self.core_based_accelerator),
             self.scheduler_candidate_selection,
             [],
             layer_stacks,
@@ -73,6 +77,31 @@ class CoreBasedFitnessEvaluator(FitnessEvaluator):
         if not return_scme:
             return energy, latency
         return energy, latency, scme
+
+
+    def update_core_based_accelerator(self, layer_stacks, workload_with_allocations, core_allocations):
+        updated_core_allocations = []
+        core_nodes = []
+        i = 0
+        for stack in layer_stacks:
+            for stack_core in stack:
+                core_0 = next((x for x in self.accelerator.cores.nodes() if x.id == core_allocations[i]),None)
+                layer_node = next((x for x in workload_with_allocations.nodes() if isinstance(x, ComputationNode) and x.id[0] == stack_core),None)
+                core_tmp = deepcopy(core_0)
+                core_tmp.id = i
+                layer_node.mappings[core_tmp] = layer_node.mappings[core_0]
+
+                core_nodes.append(core_tmp)
+                updated_core_allocations.append(i)
+                layer_node.core_allocation = i
+                layer_node.attrs['core_allocation'] = i
+                layer_node.set_core_allocation(i)
+                i += 1
+        G = nx.Graph()
+        for ii_n, nn in enumerate(core_nodes[1:]):
+            G.add_edge(core_nodes[ii_n],nn)
+        self.core_based_accelerator.cores = deepcopy(G)
+        return updated_core_allocations
 
     def set_cost_cn_nodes(self):
         for node in nx.topological_sort(self.cn_graph):

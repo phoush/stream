@@ -42,7 +42,6 @@ class LomaStage(Stage):
         )
 
         for tm in self.engine.run():
-
             kwargs = self.kwargs.copy()
             kwargs["accelerator"] = self.accelerator
             kwargs["layer"] = self.layer
