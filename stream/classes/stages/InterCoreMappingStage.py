@@ -49,7 +49,6 @@ class InterCoreMappingStage(Stage):
             nb_ga_generations (int): The number of generations considered by the genetic algorithm
             nb_ga_individuals (int): The number of individuals in each genetic algorithm generation
         """
-        breakpoint()
         super().__init__(list_of_callables, **kwargs)
         self.workload = workload
         self.accelerator = accelerator
@@ -100,7 +99,6 @@ class InterCoreMappingStage(Stage):
                 self.layer_groups_flexible.append((layer_id, group_id))
                 self.valid_allocations.append(valid_core_ids)
 
-        breakpoint()
         # Set the hardware performance and core_allocation of nodes in the workload that only have a single possible core allocation
         self.set_hw_performance_non_flexible_nodes()
 

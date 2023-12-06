@@ -3,10 +3,22 @@ import numpy as np
 from math import prod
 from rtree import index
 from typing import List, Dict
+from stream.classes.workload.elementwise_node import ElementwiseNode
+from stream.classes.workload.flatten_node import FlattenNode
+from stream.classes.workload.lpnormalization_node import LpNormalizationNode
+from stream.classes.workload.reshape_node import ReshapeNode
+from stream.classes.workload.transpose_node import TransposeNode
+from stream.classes.workload.tensor import Tensor
 from stream.classes.workload.computation_node import ComputationNode
 from stream.classes.workload.dummy_node import DummyNode
 from zigzag.classes.mapping.temporal.temporal_loop import TemporalLoop
 import logging
+import itertools
+from stream.classes.opt.splitting.splitting import (
+    convert_inner_cn_loops,
+    convert_outer_cn_loops,
+    convert_outer_cn_loops_with_k,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -93,9 +105,10 @@ def get_outer_tmap_loop_dimensions(workload, accelerator, node) -> List[Temporal
         loop_req['K'] /= np.prod([x[1] for x in sm_current_node if x[0] == 'K'])
         
         if 'OX' in [x[0] for x in sm_successor]:
+            if successor.padding == {}:
+                successor.padding = {'IX':(0,0),'IY':(0,0)}
             loop_req['OX'] = ((sm_successor_loops['OX'] - sm_successor_loops['FX']+2*successor.padding['IX'][0])/successor.stride['IX'] + 1)
             loop_req['OY'] = ((sm_successor_loops['OY'] - sm_successor_loops['FY']+2*successor.padding['IY'][0])/successor.stride['IY'] + 1)
-            
             loop_req['OX'] /= np.prod([x[1] for x in sm_current_node if x[0] == 'OX'])
             loop_req['OY'] /= np.prod([x[1] for x in sm_current_node if x[0] == 'OY'])
 
@@ -804,7 +817,7 @@ def get_inter_edges_tensor_based(producer_output_tensor, consumer_input_tensor):
 
 
 def get_inter_edges_numpy(
-    producer, consumer, finer_producers, finer_consumers, finer_nodes_dict
+    producer, consumer, finer_producers, finer_consumers, finer_nodes_dict, workload
 ):
     numpy_tensors = {}
     # Get the paths from producer to consumer
@@ -988,7 +1001,7 @@ def get_cn_graph(workload, accelerator):
         # print((producer, consumer, is_complex))
         if is_complex:
             inter_edges = get_inter_edges_numpy(
-                producer, consumer, finer_producers, finer_consumers
+                producer, consumer, finer_producers, finer_consumers, finer_nodes_dict, workload
             )
         else:
             inter_edges = get_inter_edges_rtree(

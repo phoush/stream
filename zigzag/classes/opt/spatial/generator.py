@@ -166,15 +166,14 @@ class UserSpatialMappingGenerator:
                     # In that case we change the unrolling size to 7 (to be a factor of 14).
                     # We have to make sure the unrolling size is a divisor of the layer dimension size:
                     # Jan 18 2023: Commented this out as LomaStage allows greedy mapping by adding one more temporal iteration
-                    # while layer_dim_size % unrolling_size != 0:
-                    #     unrolling_size -= 1  # decrement the unrolling by 1
+                    while layer_dim_size % unrolling_size != 0:
+                        unrolling_size -= 1  # decrement the unrolling by 1
 
                     # If the unrolling_size is not 1 and the layer dim is in the user-provided hints,
                     # add it to the unrollings for this oa_dim
                     if unrolling_size != 1 and layer_dim in oa_dim_unrolling_hints:
                         oa_dim_unrollings.append((layer_dim, unrolling_size))
-
-                if enable_mix_spatial_mapping_generation:
+                if True:#enable_mix_spatial_mapping_generation:
                     # Now all unrollings in oa_dim_unrollings are for single layer dimension.
                     # If mix spatial mapping is enabled, we will add the mix unrollings to oa_dim_unrollings next.
                     oa_dim_unrollings = self.append_mix_spatial_unrollings(
@@ -233,6 +232,7 @@ class UserSpatialMappingGenerator:
                     left_layer_dim_size=left_layer_dim_size,
                     enable_mix_spatial_mapping_generation=enable_mix_spatial_mapping_generation,
                 )
+
             yield user_spatial_mapping
             yield_count += 1
         # If yield_count==0, it means there is no legal spatial mapping found.
@@ -241,6 +241,7 @@ class UserSpatialMappingGenerator:
         # The other reason could be: there is a layer dim mapped on multiple oa dims,
         # so the product has exceeded the layer dim size.
         # For a quick fix on the second cause, we will reform the sm loop only for single layer dim mapping.
+
         if yield_count == 0:
             for combination in itertools.product(*unrollings):
                 is_mix_comb = False

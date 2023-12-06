@@ -69,7 +69,7 @@ class SpatialMappingGeneratorStage(Stage):
     ## Run this stage by generating user-formatted spatial mappings which are converted
     # to the memory-level based spatial mapping representation.
     def run(self):
-        user_provided_spatial_mappings = self.layer.user_spatial_mapping
+        user_provided_spatial_mappings = None#self.layer.user_spatial_mapping
         user_spatial_mapping_hint = self.layer.user_spatial_mapping_hint
         core_id = self.layer.core_allocation
         core: Core = self.accelerator.get_core(core_id=core_id)
