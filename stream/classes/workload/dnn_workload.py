@@ -16,6 +16,7 @@ mapping_attrs = {
         "core_allocation": 1,
         # "spatial_mapping": {"D1": ("OX", 25), "D2": (("FX", 3), ("FY", 3))},
         "memory_operand_links": {"O": "O", "W": "I2", "I": "I1"},
+        "temporal_ordering":['FX','FY','C','K','OX','OY'],
         "spatial_mapping_hint": {"D1": ["K", "OX"], "D2": ["C", "FX", "FY"], "D3":["K","C","OX","OY","G"]},
     }
 }
@@ -53,6 +54,7 @@ class DNNWorkload(DiGraph):
             layer["spatial_mapping"] = spatial_mapping
 
             """ Add temporal ordering to the layer attribute """
+            layer["temporal_ordering"] = ['FX','FY','C','K','OX','OY']
             # TODO allow user to define fixed temporal loop order
 
             """For each item in the dict generate the LayerNode and add it to the dnn graph G"""

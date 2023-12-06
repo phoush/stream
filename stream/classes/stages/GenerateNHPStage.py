@@ -139,7 +139,7 @@ class GenerateNHPStage(Stage):
                 MinimalEnergyStage,
                 SpatialMappingGeneratorStage,  # Generates multiple spatial mappings (SM)
                 MinimalEnergyStage,  # Reduces all CMEs, returning minimal latency one
-                LomaStage,  # Generates multiple temporal mappings (TM)
+                TemporalOrderingConversionStage,  # Generates multiple temporal mappings (TM)
                 CostModelStage,  # Evaluates generated SM and TM through cost model
             ],
             layer=node,

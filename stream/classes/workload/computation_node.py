@@ -61,6 +61,7 @@ class ComputationNode(LayerNode, Node):
             output_names=output_names,
         )
 
+        self.user_temporal_ordering = [('FX','all'),('FY','all'),('C','all'),('K','all'),('OX','all'),('OY','all')]
         self.mapping_attrs = mapping_attrs
         self.mappings = mappings
         self.stride = {'IY':1,'IX':1}

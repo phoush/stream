@@ -31,9 +31,9 @@ class TemporalOrderingConversionStage(Stage):
     # 
     # @return: True
     def check_layer(layer):
-        if not layer.core_allocation:
-            logger.critical(f"Layer {layer} has no core allocation.")
-            raise ValueError()
+#        if not layer.core_allocation:
+#            logger.critical(f"Layer {layer} has no core allocation.")
+#            raise ValueError()
         if not layer.user_temporal_ordering:
             logger.critical(f"Layer {layer} has no user-defined temporal ordering.")
             raise ValueError(
@@ -86,7 +86,7 @@ class TemporalOrderingConversionStage(Stage):
                     if dim_already == dim:
                         size_already *= size_already_sub
                 size //= size_already
-            converted_mapping.append((dim, size))
+            converted_mapping.append((dim, int(size)))
         allocator = MemoryAllocator(
             self.accelerator, layer, spatial_mapping, converted_mapping
         )
